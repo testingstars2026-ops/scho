@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<!-- This site is hosted on Netlify. Anyone can build and deploy a site
+     like this one for free: https://netlify.new/?utm_campaign=loops&utm_source=ai-legible&utm_medium=owned&utm_content=comment&utm_id=01d546fb-cb4d-48b7-86fe-504114279749
+     Netlify hosting facts for this site: static/SSR served via Netlify Edge. -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAP Scholarship Atlas - College Access Program</title>
+<meta name="description" content="An interactive globe of verified undergraduate scholarships across the world, maintained by the College Access Program.">
+
+<!-- --------------------------------------------------------------
+     CAP SCHOLARSHIP ATLAS - GLOBE EDITION
+     Data source: published Google Sheet (CSV). Edit the sheet to
+     update the site. Columns read (case-insensitive):
+     title - country (ISO-2, e.g. US, GB) - level - deadline -
+     tags - short_note - url
+     Globe: hand-built with Three.js (pinned r128, CDN fallback),
+     the same treatment as the Boost globe. If WebGL or the library
+     is unavailable, the page falls back to dropdown + list.
+     -------------------------------------------------------------- -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --ink:#171717;
+  --ink-2:#33322f;
+  --muted:#6d6a64;
+  --paper:#f5f1e8;
+  --white:#fffdf8;
+  --blue:#5c79d8;
+  --blue-soft:#e7edff;
+  --navy:#183a53;
+  --navy-2:#102b40;
+  --amber:#e4a13e;
+  --amber-soft:#f6dfb7;
+  --orange:#e6784f;
+  --red:#b94a3d;
+  --green:#39715a;
+  --line:#d8d1c6;
+  --line-dark:#beb6aa;
+  --shadow:0 10px 28px rgba(23,23,23,.06);
+  --radius:18px;
+  --f-display:"Instrument Serif",Georgia,serif;
+  --f-ui:"Inter",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:var(--f-ui);font-size:15.5px;line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select{font:inherit}
+button{cursor:pointer}
+a{color:inherit}
+:focus-visible{outline:3px solid rgba(92,121,216,.35);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-left:28px;padding-right:28px}
+
+/* topbar */
+.topbar{background:rgba(245,241,232,.95);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:50;backdrop-filter:blur(10px)}
+.topbar-inner{max-width:1180px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+.brand-mark{width:36px;height:36px;border:2px solid var(--ink);border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:11px}
+.brand-copy strong{display:block;font-size:13px;line-height:1.15}
+.brand-copy span{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}
+.topnav{display:flex;align-items:center;gap:24px;font-size:12.5px}
+.topnav a{text-decoration:none;color:var(--ink-2)}
+.topnav .cap-home{background:var(--blue-soft);color:#2c4f99;font-weight:700;padding:9px 13px;border-radius:10px}
+
+/* hero */
+.hero{padding:30px 0 22px}
+.hero-card{max-width:1180px;margin:0 auto;background:var(--white);border:1px solid var(--line);border-radius:26px;overflow:hidden;box-shadow:var(--shadow)}
+.hero-inner{display:grid;grid-template-columns:1.05fr .95fr;min-height:530px}
+.hero-copy{padding:54px 54px 48px;display:flex;flex-direction:column;justify-content:center}
+.eyebrow{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--navy)}
+h1{font-family:var(--f-ui);font-weight:800;font-size:clamp(52px,6.4vw,82px);line-height:.94;letter-spacing:-.055em;margin-top:14px;max-width:650px}
+h1 em{font-family:var(--f-display);font-weight:400;font-style:italic;color:var(--orange);letter-spacing:-.02em}
+.hero-sub{font-size:19px;line-height:1.5;max-width:590px;color:var(--ink-2);margin-top:22px}
+.hero-actions{display:flex;gap:11px;flex-wrap:wrap;margin-top:28px}
+.hero-link{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:0 18px;border-radius:12px;text-decoration:none;font-size:13.5px;font-weight:700}
+.hero-link.primary{background:var(--blue);color:white}
+.hero-link.secondary{background:#edf0f5;color:var(--ink)}
+.hero-stats{display:flex;gap:24px;flex-wrap:wrap;margin-top:30px;padding-top:22px;border-top:1px solid var(--line);max-width:590px}
+.stat{min-width:110px}
+.stat b{display:block;font-size:24px;line-height:1;font-weight:800}
+.stat span{display:block;margin-top:6px;color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;font-weight:700}
+.hero-art{background:var(--amber);display:grid;place-items:center;border-left:1px solid rgba(23,23,23,.12);padding:28px;position:relative;overflow:hidden}
+.hero-art::before{content:"";position:absolute;width:170px;height:170px;background:var(--blue);border-radius:50%;right:-65px;top:-60px}
+.hero-art::after{content:"";position:absolute;width:120px;height:120px;background:var(--orange);transform:rotate(18deg);left:-45px;bottom:-42px}
+.hero-art svg{width:min(100%,480px);height:auto;position:relative;z-index:1}
+
+/* atlas block */
+.atlas-section{padding:0}
+.atlas-shell{max-width:none;margin:0;background:var(--navy);color:#fff;border-radius:26px;overflow:hidden;display:grid;grid-template-columns:330px 1fr;min-height:500px;box-shadow:var(--shadow)}
+.atlas-copy{padding:40px 32px;display:flex;flex-direction:column;justify-content:center;border-right:1px solid rgba(255,255,255,.12)}
+.atlas-copy .eyebrow{color:#f2c975}
+.atlas-copy h2{font-family:var(--f-display);font-weight:400;font-size:48px;line-height:.98;margin-top:14px}
+.atlas-copy p{color:rgba(255,255,255,.72);font-size:14px;margin-top:16px}
+.atlas-copy .mini-rule{height:1px;background:rgba(255,255,255,.16);margin:24px 0}
+.atlas-copy .micro{font-size:11.5px;color:rgba(255,255,255,.55)}
+.globe-side{position:relative;min-height:500px;overflow:hidden;background:
+  radial-gradient(circle at 72% 28%,rgba(92,121,216,.35),transparent 31%),
+  radial-gradient(circle at 20% 74%,rgba(228,161,62,.12),transparent 34%),
+  linear-gradient(180deg,#163a56,#102b40)}
+#globeViz{width:100%;height:100%;min-height:500px;position:relative;display:flex;align-items:center;justify-content:center;cursor:grab}
+#globeViz canvas{outline:none;position:relative;z-index:1;cursor:inherit!important}
+.globe-hint{position:absolute;left:50%;bottom:17px;transform:translateX(-50%);z-index:6;padding:8px 12px;border:1px solid rgba(255,255,255,.15);border-radius:999px;background:rgba(8,19,29,.6);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.66);white-space:nowrap;pointer-events:none}
+.globe-loading{position:absolute;inset:0;z-index:5;display:grid;place-items:center;color:rgba(255,255,255,.56);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.globe-loading .orb{width:42px;height:42px;border-radius:50%;border:3px solid rgba(255,255,255,.14);border-top-color:#f2c975;animation:orb 1s linear infinite;margin:0 auto 12px}
+@keyframes orb{to{transform:rotate(360deg)}}
+.fallback-globe{display:none;position:absolute;left:50%;top:50%;z-index:2;width:min(380px,78vw);aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);border:1px solid rgba(255,255,255,.16);background:radial-gradient(circle at 35% 30%,#335f80 0%,#1a3e59 42%,#0c2335 72%);box-shadow:inset -28px -22px 42px rgba(0,0,0,.3)}
+.fallback-globe::before,.fallback-globe::after{content:"";position:absolute;inset:8%;border-radius:50%;border:1px solid rgba(255,255,255,.12)}
+.fallback-globe::before{transform:scaleX(.36)}
+.fallback-globe::after{transform:rotate(90deg) scaleX(.36)}
+.fallback-line{position:absolute;left:8%;right:8%;top:50%;height:1px;background:rgba(255,255,255,.12)}
+.fallback-line.one{top:32%}.fallback-line.two{top:68%}
+.fallback-dot{position:absolute;z-index:2;width:10px;height:10px;border:0;border-radius:50%;background:#f2c975;box-shadow:0 0 0 5px rgba(242,201,117,.12),0 0 18px rgba(242,201,117,.55);transform:translate(-50%,-50%)}
+.fallback-dot.active{background:#fff;box-shadow:0 0 0 7px rgba(255,255,255,.14),0 0 22px rgba(255,255,255,.8)}
+.fallback-dot span{position:absolute;left:50%;top:-26px;transform:translateX(-50%);padding:4px 7px;border-radius:999px;background:rgba(8,19,29,.78);color:#fff;font-size:9px;font-weight:800;letter-spacing:.08em;white-space:nowrap}
+.globe-label{position:absolute;z-index:4;transform:translate(-50%,-135%);display:inline-flex;align-items:center;gap:6px;background:rgba(11,27,42,.88);border:1px solid rgba(242,201,117,.5);color:#fff;border-radius:7px;padding:4px 8px;font-family:var(--f-ui);font-size:9.5px;font-weight:700;letter-spacing:.08em;white-space:nowrap;cursor:pointer}
+.globe-label.active{background:#f2c975;color:#0a1520;border-color:#f2c975}.globe-label .gl-n{color:#f2c975}.globe-label.active .gl-n{color:#0a1520}
+.globe-scroll-cta{display:none}
+
+/* finder / controls */
+.controls{position:sticky;top:65px;z-index:30;background:rgba(245,241,232,.92);backdrop-filter:blur(12px);border-top:1px solid rgba(216,209,198,.8);border-bottom:1px solid rgba(216,209,198,.9)}
+.controls-inner{max-width:1180px;margin:0 auto;padding:16px 28px}
+.controls-head{display:flex;align-items:end;justify-content:space-between;gap:24px;margin-bottom:12px}
+.controls-head h2{font-family:var(--f-display);font-weight:400;font-size:34px;line-height:1}
+.controls-head p{font-size:12.5px;color:var(--muted);max-width:420px}
+.controls-panel{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:11px;box-shadow:0 8px 24px rgba(23,23,23,.05)}
+.controls-row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.search{position:relative;flex:1.5;min-width:250px}
+.search svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:15px;height:15px;stroke:var(--muted);fill:none;stroke-width:2.2;pointer-events:none}
+.search input{width:100%;min-height:46px;padding:0 15px 0 39px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);font-size:14px}
+.search input::placeholder{color:#8a867f}
+.search input:focus,.select-wrap select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(92,121,216,.1)}
+.select-wrap{position:relative;min-width:210px;flex:.8;max-width:300px}
+.select-wrap::after{content:"";position:absolute;right:15px;top:50%;width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.select-wrap select{width:100%;appearance:none;-webkit-appearance:none;min-height:46px;padding:0 38px 0 13px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);font-size:14px;font-weight:600}
+.btn-soon,.btn-surprise{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:46px;padding:0 14px;border-radius:11px;font-weight:700;font-size:12.5px;white-space:nowrap}
+.btn-soon{background:#fff;border:1px solid var(--line);color:var(--ink)}
+.btn-soon.active{background:#fff0ea;border-color:#efb6a4;color:#9c3f30}
+.btn-surprise{border:0;background:var(--ink);color:white}
+.btn-surprise svg{width:14px;height:14px;fill:currentColor}
+.chip-row{display:flex;gap:7px;align-items:center;margin-top:10px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+.chip-label{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);flex-shrink:0;margin-right:2px}
+.chip{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink-2);font-size:11.5px;font-weight:600;white-space:nowrap}
+.chip:hover{border-color:var(--blue)}.chip.active{background:var(--blue);border-color:var(--blue);color:#fff}.chip .count{font-size:10px;color:var(--muted)}.chip.active .count{color:rgba(255,255,255,.78)}
+
+/* view switch */
+.view-toggle{display:inline-flex;background:#ece7de;border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px}
+.view-toggle button{border:0;background:transparent;color:var(--muted);font-size:11.5px;font-weight:700;min-height:32px;padding:0 12px;border-radius:8px}
+.view-toggle button.active{background:var(--white);color:var(--ink);box-shadow:0 1px 5px rgba(0,0,0,.06)}
+.view-panel[hidden]{display:none!important}
+.globe-view-note{font-size:12px;color:var(--muted);margin:0 0 12px 2px}
+
+/* results */
+main{max-width:1180px;margin:0 auto;padding:24px 28px 36px}
+.result-line{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:0 2px 14px;border-bottom:1px solid var(--line)}
+.result-count{font-size:13.5px;color:var(--muted)}.result-count b{font-size:16px;color:var(--ink);font-weight:800}
+.clear-all{display:none;background:none;border:none;color:#3458a3;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;text-decoration:underline;text-underline-offset:3px}.clear-all.show{display:inline}
+.region{margin-top:8px}
+.grid{display:block}
+.card{background:transparent;border-bottom:1px solid var(--line);padding:22px 2px;display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:28px;align-items:start;transition:background .14s ease}
+.card:hover{background:rgba(255,253,248,.55)}
+.card-main{min-width:0}
+.card-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:7px}
+.card-country{font-size:10.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--navy)}
+.card-level{font-size:10.5px;color:var(--muted)}
+.card h3{font-family:var(--f-ui);font-weight:700;font-size:22px;line-height:1.22;letter-spacing:-.025em;color:var(--ink);max-width:760px}
+.card-note{font-size:13.5px;color:var(--ink-2);line-height:1.55;margin-top:8px;max-width:760px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.tag{font-size:10.5px;font-weight:700;padding:5px 8px;border-radius:999px;background:var(--amber-soft);color:#76511b;border:1px solid rgba(228,161,62,.25)}
+.card-aside{display:flex;flex-direction:column;align-items:flex-end;gap:13px;text-align:right;padding-top:1px}
+.deadline-box span{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:800}
+.deadline-box strong{display:block;margin-top:5px;font-size:13px;line-height:1.3}
+.deadline-box.soon strong{color:var(--red)}
+.details{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 12px;border-radius:10px;background:var(--ink);color:#fff;font-size:12px;font-weight:700;text-decoration:none}
+.card.pulse{background:#fff8e8;box-shadow:inset 0 0 0 2px var(--amber)}
+.state{text-align:center;padding:64px 20px;color:var(--muted)}.state .big{font-family:var(--f-display);font-size:44px;color:var(--ink);display:block}.state h3{font-size:19px;color:var(--ink);margin:10px 0 5px}.state p{font-size:13px;max-width:430px;margin:0 auto}.state button{margin-top:18px;padding:10px 18px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:700}
+.skeleton{display:grid;gap:0;margin-top:8px}.sk{height:150px;border-bottom:1px solid var(--line);background:linear-gradient(90deg,rgba(255,255,255,.22),rgba(255,255,255,.72),rgba(255,255,255,.22));background-size:200% 100%;animation:shimmer 1.4s infinite}@keyframes shimmer{to{background-position:-200% 0}}
+
+/* small trust strip */
+.trust-strip{max-width:1180px;margin:10px auto 0;padding:0 28px}
+.trust-card{border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:26px 0 10px}
+.trust-item strong{display:block;font-size:12px;margin-bottom:5px}.trust-item p{font-size:11.5px;color:var(--muted)}
+
+/* footer */
+footer{margin-top:18px}.footer-inner{max-width:1180px;margin:0 auto;padding:20px 28px 30px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+#backTop{position:fixed;right:16px;bottom:16px;z-index:60;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--ink);color:white;font-size:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(0,0,0,.18);opacity:0;visibility:hidden;transform:translateY(8px);transition:.2s ease}
+#backTop.show{opacity:1;visibility:visible;transform:none}
+
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
+@media(max-width:900px){
+  .topnav a:not(.cap-home){display:none}
+  .hero-inner{grid-template-columns:1fr}
+  .hero-copy{padding:40px 34px}
+  .hero-art{border-left:0;border-top:1px solid var(--line);min-height:360px}
+  .atlas-shell{grid-template-columns:1fr}
+  .atlas-copy{border-right:0;border-bottom:1px solid rgba(255,255,255,.12);padding:30px 28px}
+  .globe-side,#globeViz{min-height:410px}
+  .controls{top:65px}
+  .controls-head{align-items:start;flex-direction:column;gap:6px}
+  .card{grid-template-columns:1fr 160px}
+  .trust-card{grid-template-columns:1fr}
+}
+@media(max-width:640px){
+  .topbar-inner,.wrap,.controls-inner,main,.footer-inner,.trust-strip{padding-left:16px;padding-right:16px}
+  .hero{padding:14px 12px 18px}
+  .hero-card{border-radius:20px}
+  .hero-copy{padding:30px 22px}
+  h1{font-size:46px}
+  .hero-sub{font-size:16px}
+  .hero-actions{display:grid;grid-template-columns:1fr}
+  .hero-stats{gap:18px}
+  .hero-art{min-height:300px;padding:18px}
+  .atlas-section{padding:8px 12px 28px}
+  .atlas-shell{border-radius:20px}
+  .atlas-copy h2{font-size:40px}
+  .globe-side,#globeViz{min-height:300px;touch-action:pan-y}
+  #globeViz canvas{touch-action:pan-y!important}
+  .globe-hint{white-space:normal;text-align:center;max-width:calc(100vw - 52px)}
+  .globe-scroll-cta{display:inline-flex}
+  .controls{position:relative;top:auto}
+  .controls-inner{padding-top:14px;padding-bottom:14px}
+  .controls-head h2{font-size:30px}
+  .controls-row{display:grid;grid-template-columns:1fr}
+  .search,.select-wrap,.btn-soon,.btn-surprise{width:100%;max-width:none;min-width:0}
+  .card{grid-template-columns:1fr;padding:18px 0}
+  .card-aside{align-items:flex-start;text-align:left}
+  .deadline-box{text-align:left}
+  .details{width:100%}
+}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="https://www.collegeaccessprogram.in/" target="_blank" rel="noopener noreferrer">
+      <span class="brand-mark">CAP</span>
+      <span class="brand-copy"><strong>Scholarship Atlas</strong><span>College Access Program</span></span>
+    </a>
+    <nav class="topnav" aria-label="Scholarship Atlas navigation">
+      <a href="#finder">Find scholarships</a>
+      <a href="#finder" id="topGlobeLink">Explore the globe</a>
+      <a class="cap-home" href="https://www.collegeaccessprogram.in/" target="_blank" rel="noopener noreferrer">CAP Home ↗</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-card">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <span class="eyebrow">CAP Scholarship Atlas</span>
+        <h1>Find scholarships you can <em>actually use.</em></h1>
+        <p class="hero-sub">Undergraduate funding opportunities organised by country, deadline and scholarship type. Search when you know what you need. Spin the globe when you want to explore.</p>
+        <div class="hero-actions">
+          <a class="hero-link primary" href="#finder">Find scholarships</a>
+          <a class="hero-link secondary" href="#finder" id="openGlobeHero">Explore the globe</a>
+        </div>
+        <div class="hero-stats" aria-live="polite">
+          <div class="stat"><b id="statScholar">-</b><span>Scholarships</span></div>
+          <div class="stat"><b id="statCountry">-</b><span>Countries</span></div>
+          <div class="stat"><b>Live</b><span>Sheet-powered data</span></div>
+        </div>
+      </div>
+
+      <div class="hero-art" aria-hidden="true">
+        <svg viewBox="0 0 520 430" role="img">
+          <path d="M89 344c18-48 65-77 121-77 77 0 135 45 193 55 30 5 49 3 72-4v67H62l27-41z" fill="#171717"/>
+          <path d="M119 155c0-46 35-80 82-80 50 0 86 37 86 84 0 43-33 79-82 79-49 0-86-36-86-83z" fill="#171717"/>
+          <path d="M155 153c5-31 24-50 54-50 28 0 50 17 59 42-4 42-24 69-59 69-34 0-59-24-54-61z" fill="#fffdf8" stroke="#171717" stroke-width="4"/>
+          <circle cx="225" cy="150" r="5" fill="#171717"/>
+          <path d="M210 174c12 1 22 7 29 18" fill="none" stroke="#171717" stroke-width="4" stroke-linecap="round"/>
+          <path d="M166 226c30-15 78-15 113 6 36 22 52 53 63 102H94c10-55 30-89 72-108z" fill="#fffdf8" stroke="#171717" stroke-width="4"/>
+          <g stroke="#171717" stroke-width="3">
+            <path d="M132 252l18 12-16 13 17 12-16 14 18 12"/>
+            <path d="M181 244l18 12-16 13 17 12-16 14 18 12"/>
+            <path d="M230 244l18 12-16 13 17 12-16 14 18 12"/>
+          </g>
+          <path d="M280 238c26 16 48 27 81 28l28 40c-40 10-78 0-111-19-20-12-32-24-45-43l47-6z" fill="#5c79d8" stroke="#171717" stroke-width="4"/>
+          <rect x="335" y="177" width="91" height="115" rx="8" fill="#fffdf8" stroke="#171717" stroke-width="4" transform="rotate(8 335 177)"/>
+          <circle cx="386" cy="228" r="12" fill="#e6784f" stroke="#171717" stroke-width="4"/>
+          <path d="M377 228l7 7 13-17" fill="none" stroke="#171717" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <rect x="57" y="58" width="86" height="70" rx="9" fill="#5c79d8" stroke="#171717" stroke-width="4"/>
+          <path d="M78 91h44" stroke="#fffdf8" stroke-width="5" stroke-linecap="round"/>
+          <path d="M83 107h34" stroke="#fffdf8" stroke-width="5" stroke-linecap="round"/>
+          <circle cx="408" cy="99" r="49" fill="#fffdf8" stroke="#171717" stroke-width="4"/>
+          <path d="M382 99h52M408 73v52M389 80c19 16 19 39 0 55M427 80c-19 16-19 39 0 55" fill="none" stroke="#171717" stroke-width="3"/>
+          <path d="M436 137l35 34" stroke="#171717" stroke-width="8" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </div>
+  </div>
+</section>
+
+<button id="backTop" type="button" aria-label="Back to top">↑</button>
+
+<div class="controls" id="finder">
+  <div class="controls-inner">
+    <div class="controls-head">
+      <div>
+        <h2>Find a scholarship.</h2>
+        <p style="margin-top:6px">Search first. Then narrow by destination, deadline or scholarship type.</p>
+      </div>
+      <div class="view-toggle" aria-label="Choose how to browse">
+        <button type="button" id="viewList" class="active">List</button>
+        <button type="button" id="viewGlobe">Globe</button>
+      </div>
+    </div>
+    <div class="controls-panel">
+      <div class="controls-row">
+        <div class="search">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+          <input id="q" type="search" placeholder="Search scholarship, subject or country…" aria-label="Search scholarships">
+        </div>
+        <div class="select-wrap">
+          <select id="countrySel" aria-label="Choose a country">
+            <option value="">All countries</option>
+          </select>
+        </div>
+        <button class="btn-soon" id="closingSoon" type="button">Closing soon</button>
+        <button class="btn-surprise" id="surprise" type="button">
+          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm6.9 9h-2.95a15.6 15.6 0 00-1.38-6.03A8.02 8.02 0 0118.9 11zM12 4.04c.83 1.2 1.72 3.4 1.94 6.96h-3.88c.22-3.56 1.11-5.76 1.94-6.96zM5.1 13h2.95c.18 2.3.68 4.36 1.38 6.03A8.02 8.02 0 015.1 13zm2.95-2H5.1a8.02 8.02 0 014.33-6.03A15.6 15.6 0 008.05 11zM12 19.96c-.83-1.2-1.72-3.4-1.94-6.96h3.88c-.22 3.56-1.11 5.76-1.94 6.96zM15.57 19.03c.7-1.67 1.2-3.73 1.38-6.03h2.95a8.02 8.02 0 01-4.33 6.03z"/></svg>
+          Show me one
+        </button>
+      </div>
+      <div class="chip-row" id="tagRow" role="group" aria-label="Filter by scholarship type"></div>
+    </div>
+  </div>
+</div>
+
+<main>
+  <section id="listView" class="view-panel">
+    <div class="result-line">
+      <div class="result-count" id="resultCount">Loading scholarships…</div>
+      <button class="clear-all" id="clearAll" type="button">Clear filters</button>
+    </div>
+    <div id="results">
+      <div class="skeleton"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>
+    </div>
+  </section>
+
+  <section id="globeView" class="view-panel" hidden>
+    <p class="globe-view-note">Drag the globe to browse. Click a highlighted destination and we’ll take you straight back to the filtered scholarship list.</p>
+    <div class="atlas-section">
+      <div class="atlas-shell">
+        <div class="atlas-copy">
+          <span class="eyebrow">Explore by destination</span>
+          <h2>Pick a country. See what’s there.</h2>
+          <p>Every highlighted destination has scholarships in the live CAP dataset. The globe is a browsing tool — not a decorative extra.</p>
+          <div class="mini-rule"></div>
+          <div class="micro">Already know your destination? Use the country filter above instead.</div>
+        </div>
+        <div class="globe-side">
+          <div id="globeViz" aria-label="Interactive globe of scholarship destinations">
+            <div class="fallback-globe" id="fallbackGlobe" aria-hidden="true">
+              <span class="fallback-line one"></span>
+              <span class="fallback-line"></span>
+              <span class="fallback-line two"></span>
+            </div>
+          </div>
+          <div class="globe-loading" id="globeLoading"><div><div class="orb"></div>Loading destinations</div></div>
+          <div class="globe-hint" id="globeHint">DRAG THE GLOBE • CHOOSE A COUNTRY</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<section class="trust-strip">
+  <div class="trust-card">
+    <div class="trust-item"><strong>Read the deadline first.</strong><p>Scholarship and admission timelines do not always line up.</p></div>
+    <div class="trust-item"><strong>Use the tags to narrow quickly.</strong><p>The filter chips come directly from the categories maintained in CAP’s scholarship sheet.</p></div>
+    <div class="trust-item"><strong>Check the scholarship page.</strong><p>Eligibility and award details can change; the linked source is the final reference.</p></div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div>A College Access Program resource. Scholarship data is loaded from CAP’s published sheet.</div>
+    <div>CAP Scholarship Atlas · <span id="year"></span></div>
+  </div>
+</footer>
+
+<!-- Same globe dependency pattern as the live app. -->
+<script src="https://unpkg.com/globe.gl"></script>
+
+
+<script>
+(function(){
+"use strict";
+
+/* ------------------------------------------------------
+   CONFIGURATION - the Google Sheet feeding the Atlas.
+   ------------------------------------------------------ */
+var CSV_URL="https://docs.google.com/spreadsheets/d/e/2PACX-1vRELc4USbme7jKH52ongdo72k_MJJtWYLcjxlAdpodydb7iylZcNjE8B8yjUFtPNhbrkP7N3K0bkhR8/pub?gid=212689004&single=true&output=csv";
+var CLOSING_SOON_DAYS=45;
+var DELHI={lat:28.61,lng:77.21};
+var GLOBE_URLS=[
+  "https://cdn.jsdelivr.net/npm/globe.gl@2.32.1/dist/globe.gl.min.js",
+  "https://unpkg.com/globe.gl@2.32.1/dist/globe.gl.min.js"
+];
+
+/* -- Country metadata: ISO-2 ? [name, region, lat, lng, ISO-numeric] -- */
+var C={
+  US:["United States","The Americas",39.8,-98.6,"840"],CA:["Canada","The Americas",56.1,-106.3,"124"],
+  MX:["Mexico","The Americas",23.6,-102.6,"484"],BR:["Brazil","The Americas",-14.2,-51.9,"076"],
+  AR:["Argentina","The Americas",-38.4,-63.6,"032"],CL:["Chile","The Americas",-35.7,-71.5,"152"],
+  CO:["Colombia","The Americas",4.6,-74.3,"170"],PE:["Peru","The Americas",-9.2,-75,"604"],
+  GB:["United Kingdom","Europe",55.4,-3.4,"826"],IE:["Ireland","Europe",53.4,-8.2,"372"],
+  FR:["France","Europe",46.2,2.2,"250"],DE:["Germany","Europe",51.2,10.4,"276"],
+  IT:["Italy","Europe",41.9,12.6,"380"],ES:["Spain","Europe",40.5,-3.7,"724"],
+  PT:["Portugal","Europe",39.4,-8.2,"620"],NL:["Netherlands","Europe",52.1,5.3,"528"],
+  BE:["Belgium","Europe",50.5,4.5,"056"],CH:["Switzerland","Europe",46.8,8.2,"756"],
+  AT:["Austria","Europe",47.5,14.6,"040"],SE:["Sweden","Europe",60.1,18.6,"752"],
+  NO:["Norway","Europe",60.5,8.5,"578"],DK:["Denmark","Europe",56.3,9.5,"208"],
+  FI:["Finland","Europe",61.9,25.7,"246"],IS:["Iceland","Europe",64.9,-19,"352"],
+  PL:["Poland","Europe",51.9,19.1,"616"],CZ:["Czech Republic","Europe",49.8,15.5,"203"],
+  HU:["Hungary","Europe",47.2,19.5,"348"],RO:["Romania","Europe",45.9,25,"642"],
+  GR:["Greece","Europe",39.1,21.8,"300"],TR:["Turkey","Europe",39,35.2,"792"],
+  RU:["Russia","Europe",61.5,90,"643"],EE:["Estonia","Europe",58.6,25,"233"],
+  LV:["Latvia","Europe",56.9,24.6,"428"],LT:["Lithuania","Europe",55.2,23.9,"440"],
+  SI:["Slovenia","Europe",46.2,14.8,"705"],SK:["Slovakia","Europe",48.7,19.7,"703"],
+  HR:["Croatia","Europe",45.1,15.2,"191"],CY:["Cyprus","Europe",35.1,33.4,"196"],
+  MT:["Malta","Europe",35.9,14.4,"470"],LU:["Luxembourg","Europe",49.8,6.1,"442"],
+  IN:["India","Asia",20.6,79,"356"],CN:["China","Asia",35.9,104.2,"156"],
+  JP:["Japan","Asia",36.2,138.3,"392"],KR:["South Korea","Asia",35.9,127.8,"410"],
+  SG:["Singapore","Asia",1.35,103.8,"702"],HK:["Hong Kong","Asia",22.4,114.1,"344"],
+  TW:["Taiwan","Asia",23.7,121,"158"],MY:["Malaysia","Asia",4.2,102,"458"],
+  TH:["Thailand","Asia",15.9,101,"764"],ID:["Indonesia","Asia",-0.8,113.9,"360"],
+  PH:["Philippines","Asia",12.9,121.8,"608"],VN:["Vietnam","Asia",14.1,108.3,"704"],
+  LK:["Sri Lanka","Asia",7.9,80.8,"144"],NP:["Nepal","Asia",28.4,84.1,"524"],
+  BD:["Bangladesh","Asia",23.7,90.4,"050"],PK:["Pakistan","Asia",30.4,69.3,"586"],
+  KZ:["Kazakhstan","Asia",48,66.9,"398"],
+  AE:["United Arab Emirates","Middle East",23.4,53.8,"784"],
+  SA:["Saudi Arabia","Middle East",23.9,45.1,"682"],QA:["Qatar","Middle East",25.3,51.2,"634"],
+  KW:["Kuwait","Middle East",29.3,47.5,"414"],OM:["Oman","Middle East",21.5,55.9,"512"],
+  BH:["Bahrain","Middle East",26,50.5,"048"],IL:["Israel","Middle East",31,34.9,"376"],
+  JO:["Jordan","Middle East",30.6,36.2,"400"],
+  EG:["Egypt","Africa",26.8,30.8,"818"],ZA:["South Africa","Africa",-30.6,22.9,"710"],
+  KE:["Kenya","Africa",-0.02,37.9,"404"],NG:["Nigeria","Africa",9.1,8.7,"566"],
+  GH:["Ghana","Africa",7.9,-1,"288"],MU:["Mauritius","Africa",-20.3,57.6,"480"],
+  MA:["Morocco","Africa",31.8,-7.1,"504"],RW:["Rwanda","Africa",-1.9,29.9,"646"],
+  AU:["Australia","Oceania",-25.3,133.8,"036"],NZ:["New Zealand","Oceania",-40.9,172.9,"554"],
+  FJ:["Fiji","Oceania",-17.7,178,"242"]
+};
+var NAME_TO_ISO={},NUM_TO_ISO={};
+Object.keys(C).forEach(function(k){
+  NAME_TO_ISO[C[k][0].toLowerCase()]=k;
+  NUM_TO_ISO[C[k][4]]=k;
+});
+NAME_TO_ISO.usa="US";NAME_TO_ISO.uk="GB";NAME_TO_ISO.uae="AE";
+NAME_TO_ISO.korea="KR";NAME_TO_ISO.holland="NL";NAME_TO_ISO.czechia="CZ";
+var REGION_ORDER=["Asia","Europe","The Americas","Middle East","Oceania","Africa","Elsewhere"];
+var regionNames=(typeof Intl!=="undefined"&&Intl.DisplayNames)?new Intl.DisplayNames(["en"],{type:"region"}):null;
+
+function isoOf(raw){
+  if(!raw)return"";
+  var v=String(raw).trim();
+  if(v.length===2)return v.toUpperCase();
+  return NAME_TO_ISO[v.toLowerCase()]||v.toUpperCase().slice(0,2);
+}
+function nameOf(iso){
+  if(C[iso])return C[iso][0];
+  if(regionNames){try{var n=regionNames.of(iso);if(n&&n!==iso)return n;}catch(e){}}
+  return iso;
+}
+function regionOf(iso){return C[iso]?C[iso][1]:"Elsewhere";}
+function latOf(iso){return C[iso]?C[iso][2]:null;}
+function lngOf(iso){return C[iso]?C[iso][3]:null;}
+function flagOf(iso){
+  if(!/^[A-Z]{2}$/.test(iso))return"";
+  return String.fromCodePoint(0x1F1E6+iso.charCodeAt(0)-65,0x1F1E6+iso.charCodeAt(1)-65);
+}
+
+/* -- CSV parsing -- */
+function parseCSV(text){
+  var rows=[],row=[],cur="",inQ=false;
+  for(var i=0;i<text.length;i++){
+    var ch=text[i],nx=text[i+1];
+    if(inQ){
+      if(ch==='"'&&nx==='"'){cur+='"';i++;}
+      else if(ch==='"'){inQ=false;}
+      else cur+=ch;
+    }else{
+      if(ch==='"')inQ=true;
+      else if(ch===','){row.push(cur);cur="";}
+      else if(ch==='\n'||(ch==='\r'&&nx==='\n')){
+        row.push(cur);cur="";
+        if(row.some(function(c){return c.trim().length;}))rows.push(row);
+        row=[];if(ch==='\r')i++;
+      }else cur+=ch;
+    }
+  }
+  row.push(cur);
+  if(row.some(function(c){return c.trim().length;}))rows.push(row);
+  return rows;
+}
+function toObjects(rows){
+  if(!rows.length)return[];
+  var head=rows[0].map(function(h){return h.toLowerCase().trim();});
+  return rows.slice(1).map(function(r){
+    var o={};head.forEach(function(h,i){o[h]=(r[i]||"").trim();});return o;
+  });
+}
+function col(o,name){
+  if(o[name]!==undefined)return o[name];
+  var k=Object.keys(o).find(function(x){return x.replace(/[\s_]/g,"")===name.replace(/[\s_]/g,"");});
+  return k?o[k]:"";
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g,function(c){
+    return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function safeUrl(value){
+  var raw=String(value||"").trim();
+  if(!raw)return "";
+  try{
+    var url=new URL(raw,window.location.href);
+    return /^https?:$/.test(url.protocol)?url.href:"";
+  }catch(e){
+    return "";
+  }
+}
+function titleCase(s){
+  return s.replace(/\w\S*/g,function(t){return t.charAt(0).toUpperCase()+t.slice(1).toLowerCase();});
+}
+function tagsOf(o){
+  var tags=[];
+  ["tags","tag","tag 1","tag 2","tag 3","type","funding"].forEach(function(k){
+    String(col(o,k)||"").split(/[;,]/).forEach(function(t){
+      t=t.trim();
+      if(t)tags.push(t);
+    });
+  });
+  return tags.filter(function(t,i){return tags.map(function(x){return x.toLowerCase();}).indexOf(t.toLowerCase())===i;});
+}
+function loadScript(src){
+  return new Promise(function(resolve,reject){
+    var s=document.createElement("script");
+    s.src=src;
+    s.async=true;
+    s.onload=resolve;
+    s.onerror=function(){reject(new Error("Could not load "+src));};
+    document.head.appendChild(s);
+  });
+}
+function loadThree(){
+  return loadGlobeLib();
+}
+function loadGlobeLib(){
+  if(window.Globe)return Promise.resolve();
+  return GLOBE_URLS.reduce(function(chain,src){
+    return chain.catch(function(){return loadScript(src);});
+  },Promise.reject()).then(function(){
+    if(!window.Globe)throw new Error("Globe library unavailable");
+  });
+}
+
+/* -- Deadlines -- */
+function parseDeadline(str){
+  if(!str)return null;
+  var s=str.trim();
+  if(/rolling|ongoing|open|varies|tba/i.test(s))return null;
+  var t=Date.parse(s);
+  if(isNaN(t)){
+    var m=s.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+    if(m){var d=+m[1],mo=+m[2],y=+m[3];if(y<100)y+=2000;
+      var dt=new Date(y,mo-1,d);if(!isNaN(dt.getTime()))return dt;}
+    return null;
+  }
+  return new Date(t);
+}
+function daysLeft(str){
+  var d=parseDeadline(str);
+  if(!d)return null;
+  return Math.ceil((d-new Date())/86400000);
+}
+function deadlineInfo(str){
+  var n=daysLeft(str);
+  var label=str&&str.trim()?str.trim():"Rolling";
+  if(n===null)return{label:label,soon:false};
+  if(n>=0&&n<=CLOSING_SOON_DAYS)return{label:"Closes in "+n+" day"+(n===1?"":"s"),soon:true};
+  return{label:label,soon:false};
+}
+
+/* -- State -- */
+var all=[],byIso={},topTags=[];
+var state={iso:"",tag:"",q:"",soon:false};
+var prefersReduced=window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* -- DOM -- */
+var $q=document.getElementById("q"),
+    $sel=document.getElementById("countrySel"),
+    $tagRow=document.getElementById("tagRow"),
+    $results=document.getElementById("results"),
+    $count=document.getElementById("resultCount"),
+    $clear=document.getElementById("clearAll"),
+    $soon=document.getElementById("closingSoon"),
+    $listView=document.getElementById("listView"),
+    $globeView=document.getElementById("globeView"),
+    $viewList=document.getElementById("viewList"),
+    $viewGlobe=document.getElementById("viewGlobe");
+document.getElementById("year").textContent=new Date().getFullYear();
+
+function showView(which){
+  var globeMode=which==="globe";
+  if($listView)$listView.hidden=globeMode;
+  if($globeView)$globeView.hidden=!globeMode;
+  if($viewList)$viewList.classList.toggle("active",!globeMode);
+  if($viewGlobe)$viewGlobe.classList.toggle("active",globeMode);
+  if(globeMode&&globe&&globe.width){
+    requestAnimationFrame(function(){
+      var wrap=document.getElementById("globeViz");
+      if(!wrap)return;
+      globe.width(wrap.clientWidth||560).height(Math.max(wrap.clientHeight||0,420));
+    });
+  }
+}
+if($viewList)$viewList.addEventListener("click",function(){showView("list");});
+if($viewGlobe)$viewGlobe.addEventListener("click",function(){showView("globe");});
+["openGlobeHero","topGlobeLink"].forEach(function(id){
+  var el=document.getElementById(id);
+  if(el)el.addEventListener("click",function(){
+    showView("globe");
+    setTimeout(function(){document.querySelector(".controls").scrollIntoView({behavior:prefersReduced?"auto":"smooth"});},0);
+  });
+});
+
+/* back-to-top: the globe captures drags, so give a one-tap way back up */
+(function(){
+  var backTop=document.getElementById("backTop");
+  if(!backTop)return;
+  var onScroll=function(){backTop.classList.toggle("show",window.pageYOffset>600);};
+  window.addEventListener("scroll",onScroll,{passive:true});
+  onScroll();
+  backTop.addEventListener("click",function(){
+    window.scrollTo({top:0,behavior:prefersReduced?"auto":"smooth"});
+  });
+})();
+setTimeout(function(){
+  var loading=document.getElementById("globeLoading");
+  if(loading&&loading.style.display!=="none")loading.style.display="none";
+},5000);
+
+/* -------------- GLOBE --------------
+   Hand-built Three.js globe in the Boost treatment:
+   wireframe sphere + surface particles, gold markers sized by
+   scholarship count, arcs from Delhi with travelling comets,
+   floating labels for top destinations, drag-to-spin with
+   momentum, auto-rotation, click-to-filter. */
+var globe=null,globeReady=false,maxCount=1;
+var G={ /* globe runtime */
+  renderer:null,scene:null,camera:null,group:null,
+  markers:[],hits:[],pulses:[],comets:[],curves:[],labels:[],
+  rotY:0.6,rotX:0.22,velY:0,dragging:false,px:0,py:0,downX:0,downY:0,
+  target:null /* {y,x} when animating to a country */
+};
+
+function ll2v(lat,lng,r){
+  var phi=(90-lat)*Math.PI/180, theta=(lng+180)*Math.PI/180;
+  return new THREE.Vector3(
+    -r*Math.sin(phi)*Math.cos(theta),
+     r*Math.cos(phi),
+     r*Math.sin(phi)*Math.sin(theta)
+  );
+}
+
+function hideGlobe(){
+  var loading=document.getElementById("globeLoading");
+  var hint=document.getElementById("globeHint");
+  if(loading)loading.style.display="none";
+  if(hint)hint.textContent="SPIN THE GLOBE • CHOOSE A COUNTRY";
+}
+
+function renderFallbackGlobe(){
+  var globe=document.getElementById("fallbackGlobe");
+  if(!globe)return;
+  globe.querySelectorAll(".fallback-dot").forEach(function(n){n.remove();});
+  Object.keys(byIso).filter(function(iso){return C[iso];}).slice(0,14).forEach(function(iso){
+    var x=(lngOf(iso)+180)/360*84+8;
+    var y=(90-latOf(iso))/180*78+11;
+    var dot=document.createElement("button");
+    dot.type="button";
+    dot.className="fallback-dot"+(state.iso===iso?" active":"");
+    dot.style.left=x+"%";
+    dot.style.top=y+"%";
+    dot.title=nameOf(iso)+" - "+byIso[iso].length+" scholarships";
+    dot.innerHTML="<span>"+esc(nameOf(iso))+"</span>";
+    dot.addEventListener("click",function(){
+      selectCountry(state.iso===iso?"":iso,true);
+    });
+    globe.appendChild(dot);
+  });
+}
+
+function initGlobe(){
+  var wrap=document.getElementById("globeViz");
+  var side=document.querySelector(".globe-side");
+  var loading=document.getElementById("globeLoading");
+  function noGlobe(){
+    hideGlobe();
+  }
+  if(typeof THREE==="undefined")return noGlobe();
+  var renderer;
+  try{
+    renderer=new THREE.WebGLRenderer({antialias:true,alpha:true});
+  }catch(e){return noGlobe();}
+
+  var w=wrap.clientWidth||560,h=Math.max(wrap.clientHeight,420);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+  renderer.setSize(w,h);
+  renderer.domElement.style.touchAction="none";
+  renderer.domElement.style.cursor="grab";
+  wrap.appendChild(renderer.domElement);
+
+  var scene=new THREE.Scene();
+  var camera=new THREE.PerspectiveCamera(42,w/h,0.1,100);
+  camera.position.z=3.0;
+
+  var group=new THREE.Group();
+  scene.add(group);
+
+  /* dark core sphere (occludes the far side of the wireframe) */
+  group.add(new THREE.Mesh(
+    new THREE.SphereGeometry(0.985,48,48),
+    new THREE.MeshBasicMaterial({color:0x0C1E30})
+  ));
+  /* wireframe shell */
+  group.add(new THREE.Mesh(
+    new THREE.SphereGeometry(1,40,40),
+    new THREE.MeshBasicMaterial({color:0x3F729B,wireframe:true,transparent:true,opacity:0.16})
+  ));
+  /* scattered surface particles */
+  (function(){
+    var n=700,pos=new Float32Array(n*3);
+    for(var i=0;i<n;i++){
+      var u=Math.random()*2-1,t=Math.random()*Math.PI*2,s=Math.sqrt(1-u*u);
+      pos[i*3]=s*Math.cos(t)*1.002;pos[i*3+1]=u*1.002;pos[i*3+2]=s*Math.sin(t)*1.002;
+    }
+    var g=new THREE.BufferGeometry();
+    g.setAttribute("position",new THREE.BufferAttribute(pos,3));
+    group.add(new THREE.Points(g,new THREE.PointsMaterial({
+      color:0x7FA8C7,size:0.014,transparent:true,opacity:0.5
+    })));
+  })();
+
+  /* destination markers, sized by scholarship count */
+  var isos=Object.keys(byIso).filter(function(i){return C[i];});
+  isos.sort(function(a,b){return byIso[b].length-byIso[a].length;});
+  var delhiV=ll2v(DELHI.lat,DELHI.lng,1.005);
+
+  isos.forEach(function(iso){
+    var n=byIso[iso].length;
+    var r=0.014+0.024*Math.sqrt(n/maxCount);
+    var v=ll2v(latOf(iso),lngOf(iso),1.005);
+    var m=new THREE.Mesh(
+      new THREE.SphereGeometry(r,12,12),
+      new THREE.MeshBasicMaterial({color:0xFFD57E})
+    );
+    m.position.copy(v);m.userData.iso=iso;m.userData.baseR=r;
+    group.add(m);G.markers.push(m);
+    /* generous invisible hit target */
+    var hit=new THREE.Mesh(
+      new THREE.SphereGeometry(Math.max(r*2.6,0.05),8,8),
+      new THREE.MeshBasicMaterial({visible:false})
+    );
+    hit.position.copy(v);hit.userData.iso=iso;
+    group.add(hit);G.hits.push(hit);
+  });
+
+  /* pulsing halos on the top destinations */
+  isos.slice(0,8).forEach(function(iso,i){
+    var v=ll2v(latOf(iso),lngOf(iso),1.005);
+    var p=new THREE.Mesh(
+      new THREE.SphereGeometry(0.02,10,10),
+      new THREE.MeshBasicMaterial({color:0xFFD57E,transparent:true,opacity:0.4})
+    );
+    p.position.copy(v);p.userData.phase=i*0.7;
+    group.add(p);G.pulses.push(p);
+  });
+
+  /* Delhi origin: bright core + persistent pulse */
+  var delhiCore=new THREE.Mesh(
+    new THREE.SphereGeometry(0.02,12,12),
+    new THREE.MeshBasicMaterial({color:0xFFFFFF})
+  );
+  delhiCore.position.copy(delhiV);group.add(delhiCore);
+  var delhiPulse=new THREE.Mesh(
+    new THREE.SphereGeometry(0.024,12,12),
+    new THREE.MeshBasicMaterial({color:0xFFE9B8,transparent:true,opacity:0.5})
+  );
+  delhiPulse.position.copy(delhiV);delhiPulse.userData.phase=0;
+  group.add(delhiPulse);G.pulses.push(delhiPulse);
+
+  /* arcs from Delhi + travelling comets */
+  isos.forEach(function(iso){
+    if(iso==="IN")return;
+    var end=ll2v(latOf(iso),lngOf(iso),1.005);
+    var angle=delhiV.angleTo(end);
+    var mid=delhiV.clone().add(end).multiplyScalar(0.5).normalize()
+      .multiplyScalar(1+0.12+angle*0.22);
+    var curve=new THREE.QuadraticBezierCurve3(delhiV.clone(),mid,end.clone());
+    var geom=new THREE.BufferGeometry().setFromPoints(curve.getPoints(44));
+    group.add(new THREE.Line(geom,new THREE.LineBasicMaterial({
+      color:0xE8C070,transparent:true,opacity:0.22
+    })));
+    G.curves.push(curve);
+  });
+  for(var ci=0;ci<Math.min(10,G.curves.length);ci++){
+    var comet=new THREE.Mesh(
+      new THREE.SphereGeometry(0.009,8,8),
+      new THREE.MeshBasicMaterial({color:0xFFE9B8,transparent:true,opacity:0.9})
+    );
+    comet.userData.curve=Math.floor(Math.random()*G.curves.length);
+    comet.userData.t=Math.random();
+    comet.userData.speed=0.0018+Math.random()*0.0022;
+    group.add(comet);G.comets.push(comet);
+  }
+
+  /* floating labels for the top destinations */
+  isos.slice(0,7).forEach(function(iso){
+    var el=document.createElement("button");
+    el.className="globe-label";
+    el.type="button";
+    el.innerHTML=flagOf(iso)+" "+esc(nameOf(iso)).toUpperCase()+
+      ' <span class="gl-n">'+byIso[iso].length+"</span>";
+    el.addEventListener("click",function(){
+      selectCountry(state.iso===iso?"":iso,true);
+    });
+    side.appendChild(el);
+    G.labels.push({el:el,v:ll2v(latOf(iso),lngOf(iso),1.06),iso:iso});
+  });
+
+  /* drag to spin, with momentum */
+  var cv=renderer.domElement;
+  cv.addEventListener("pointerdown",function(e){
+    G.dragging=true;G.px=e.clientX;G.py=e.clientY;
+    G.downX=e.clientX;G.downY=e.clientY;
+    G.target=null;
+    cv.style.cursor="grabbing";
+    cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove",function(e){
+    if(!G.dragging)return;
+    G.velY=(e.clientX-G.px)*0.005;
+    G.rotY+=G.velY;
+    G.rotX+=(e.clientY-G.py)*0.003;
+    G.rotX=Math.max(-0.9,Math.min(0.9,G.rotX));
+    G.px=e.clientX;G.py=e.clientY;
+  });
+  cv.addEventListener("pointerup",function(e){
+    G.dragging=false;
+    cv.style.cursor="grab";
+    /* a click, not a drag: raycast for a marker */
+    var moved=Math.abs(e.clientX-G.downX)+Math.abs(e.clientY-G.downY);
+    if(moved<8){
+      var rect=cv.getBoundingClientRect();
+      var mouse=new THREE.Vector2(
+        ((e.clientX-rect.left)/rect.width)*2-1,
+        -((e.clientY-rect.top)/rect.height)*2+1
+      );
+      var ray=new THREE.Raycaster();
+      ray.setFromCamera(mouse,camera);
+      var hit=ray.intersectObjects(G.hits)[0];
+      if(hit){
+        var iso=hit.object.userData.iso;
+        selectCountry(state.iso===iso?"":iso,true);
+      }
+    }
+  });
+  window.addEventListener("pointerup",function(){G.dragging=false;cv.style.cursor="grab";});
+
+  /* render loop */
+  var clock=0;
+  function frame(){
+    requestAnimationFrame(frame);
+    clock+=0.016;
+    if(G.target){
+      /* glide to selected country (shortest angular path) */
+      var dy=((G.target.y-G.rotY+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI;
+      var dx=G.target.x-G.rotX;
+      G.rotY+=dy*0.08;G.rotX+=dx*0.08;
+      if(Math.abs(dy)<0.003&&Math.abs(dx)<0.003)G.target=null;
+    }else if(!G.dragging){
+      G.velY*=0.95;
+      if(!state.iso)G.rotY+=0.0018+G.velY;
+      else G.rotY+=G.velY;
+    }
+    group.rotation.y=G.rotY;
+    group.rotation.x=G.rotX;
+    G.pulses.forEach(function(p,i){
+      var s=1+((clock*1.2+p.userData.phase)%1.6);
+      p.scale.setScalar(s);
+      p.material.opacity=Math.max(0,0.5-(s-1)*0.42);
+    });
+    G.comets.forEach(function(c){
+      c.userData.t+=c.userData.speed;
+      if(c.userData.t>=1){
+        c.userData.t=0;
+        c.userData.curve=Math.floor(Math.random()*G.curves.length);
+      }
+      c.position.copy(G.curves[c.userData.curve].getPoint(c.userData.t));
+    });
+    renderer.render(scene,camera);
+    /* project labels, fade when behind */
+    var cw=wrap.clientWidth,chh=wrap.clientHeight;
+    G.labels.forEach(function(L){
+      var world=L.v.clone().applyMatrix4(group.matrixWorld);
+      var behind=world.clone().normalize().dot(camera.position.clone().normalize())<0.25;
+      var sp=world.clone().project(camera);
+      L.el.style.left=((sp.x*0.5+0.5)*cw)+"px";
+      L.el.style.top=((-sp.y*0.5+0.5)*chh)+"px";
+      L.el.style.opacity=behind?0:1;
+      L.el.style.pointerEvents=behind?"none":"auto";
+      L.el.classList.toggle("active",L.iso===state.iso);
+    });
+  }
+
+  G.renderer=renderer;G.scene=scene;G.camera=camera;G.group=group;
+  loading.style.display="none";
+  globeReady=true;
+
+  if(typeof ResizeObserver!=="undefined"){
+    new ResizeObserver(function(){
+      var nw=wrap.clientWidth,nh=Math.max(wrap.clientHeight,340);
+      if(!nw)return;
+      renderer.setSize(nw,nh);
+      camera.aspect=nw/nh;camera.updateProjectionMatrix();
+    }).observe(wrap);
+  }
+
+  if(prefersReduced){
+    group.rotation.y=G.rotY;group.rotation.x=G.rotX;
+    renderer.render(scene,camera);
+    G.labels.forEach(function(L){L.el.style.display="none";});
+    document.getElementById("globeHint").textContent="SPIN THE GLOBE • CHOOSE A COUNTRY";
+    /* still allow click selection with a static render on demand */
+    cv.addEventListener("pointerup",function(){renderer.render(scene,camera);});
+  }else{
+    frame();
+  }
+}
+
+function refreshGlobeStyles(){
+  if(globe&&globe.pointsData){
+    var points=Object.keys(byIso)
+      .filter(function(iso){return C[iso];})
+      .map(function(iso){
+        return{iso:iso,lat:latOf(iso),lng:lngOf(iso),name:nameOf(iso),n:byIso[iso].length};
+    });
+    globe.pointsData(points);
+    if(globe.htmlElementsData)globe.htmlElementsData([]);
+    if(globe.labelsData)globe.labelsData(points);
+    if(globe.ringsData)globe.ringsData(state.iso?points.filter(function(d){return d.iso===state.iso;}):[]);
+    if(globe.arcsData)globe.arcsData([]);
+    return;
+  }
+  if(!globeReady)return;
+  G.markers.forEach(function(m){
+    var sel=m.userData.iso===state.iso;
+    m.material.color.set(sel?0xFFFFFF:0xFFD57E);
+    m.scale.setScalar(sel?1.6:1);
+  });
+}
+function flyTo(iso){
+  if(globe&&globe.pointOfView&&C[iso]){
+    globe.controls().autoRotate=false;
+    globe.pointOfView({lat:latOf(iso),lng:lngOf(iso),altitude:1.7},prefersReduced?0:650);
+    window.setTimeout(resumeSpin,prefersReduced?0:700);
+    return;
+  }
+  if(!globeReady||!C[iso])return;
+  /* rotate the globe so the country faces the camera */
+  var v=ll2v(latOf(iso),lngOf(iso),1);
+  G.target={
+    y:Math.atan2(v.x,v.z),
+    x:Math.max(-0.85,Math.min(0.85,latOf(iso)*Math.PI/180*0.85))
+  };
+}
+function resumeSpin(){
+  if(globe&&globe.controls){
+    globe.controls().autoRotate=!prefersReduced;
+    return;
+  }
+  if(!globeReady)return;
+  G.target=null;
+}
+
+/* -------------- SELECTION (globe ? dropdown ? list) -------------- */
+function initLiveGlobe(){
+  var wrap=document.getElementById("globeViz");
+  var loading=document.getElementById("globeLoading");
+  var hint=document.getElementById("globeHint");
+  if(!wrap||!window.Globe)return hideGlobe();
+  wrap.innerHTML="";
+  var points=Object.keys(byIso)
+    .filter(function(iso){return C[iso];})
+    .map(function(iso){
+      return{iso:iso,lat:latOf(iso),lng:lngOf(iso),name:nameOf(iso),n:byIso[iso].length};
+    });
+  var hoverPoint=null,draggingGlobe=false;
+  var coarsePointer=window.matchMedia&&window.matchMedia("(pointer: coarse)").matches;
+  function markerDistance(a,b){
+    var toRad=Math.PI/180;
+    var lat1=a.lat*toRad,lat2=b.lat*toRad;
+    var dLat=(b.lat-a.lat)*toRad,dLng=(b.lng-a.lng)*toRad;
+    var h=Math.sin(dLat/2)*Math.sin(dLat/2)+
+      Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLng/2)*Math.sin(dLng/2);
+    return 2*Math.atan2(Math.sqrt(h),Math.sqrt(1-h))/toRad;
+  }
+  function nearestMarker(coords,maxDeg){
+    if(!coords)return null;
+    var limit=maxDeg||8;
+    var best=null,bestDist=Infinity;
+    points.forEach(function(p){
+      var dist=markerDistance(coords,p);
+      if(dist<bestDist){best=p;bestDist=dist;}
+    });
+    return bestDist<=limit?best:null;
+  }
+  /* resolve the marker under a screen point, snapping generously on touch */
+  function markerAtEvent(e){
+    if(!globe||!globe.toGlobeCoords)return null;
+    var rect=wrap.getBoundingClientRect();
+    var coords=globe.toGlobeCoords(e.clientX-rect.left,e.clientY-rect.top);
+    return nearestMarker(coords,coarsePointer?18:9);
+  }
+  function updatePointerFromMouse(e){
+    if(draggingGlobe||!globe||!globe.toGlobeCoords)return;
+    var rect=wrap.getBoundingClientRect();
+    var coords=globe.toGlobeCoords(e.clientX-rect.left,e.clientY-rect.top);
+    hoverPoint=nearestMarker(coords);
+    var cursor=hoverPoint?"pointer":"grab";
+    wrap.style.cursor=cursor;
+    var canvas=wrap.querySelector("canvas");
+    if(canvas)canvas.style.cursor=cursor;
+  }
+  var w=wrap.clientWidth||560;
+  var h=Math.max(wrap.clientHeight||0,window.innerWidth<=640?280:420);
+  try{
+    globe=Globe()(wrap)
+      .width(w).height(h)
+      .globeImageUrl("https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg")
+      .backgroundColor("rgba(0,0,0,0)")
+      .showAtmosphere(true)
+      .atmosphereColor("#3E6FA8")
+      .atmosphereAltitude(0.18)
+      .pointsData(points)
+      .pointLat("lat")
+      .pointLng("lng")
+      .pointAltitude(0.04)
+      .pointRadius(function(d){var r=d.iso===state.iso?0.46:0.28+0.2*Math.sqrt(d.n/maxCount);return coarsePointer?r*1.35:r;})
+      .pointResolution(24)
+      .pointColor(function(d){return d.iso===state.iso?"rgba(255,255,255,0.98)":"rgba(255,224,138,0.92)";})
+      .pointLabel(function(d){
+        return "<div style=\"font:12px/1.4 system-ui;color:#dde8f2;padding:3px 6px\">"+
+          "<b>"+esc(d.name)+"</b><br>"+d.n+" scholarships</div>";
+      })
+      .onPointHover(function(d){
+        var cursor=d?"pointer":"grab";
+        wrap.style.cursor=cursor;
+        var canvas=wrap.querySelector("canvas");
+        if(canvas)canvas.style.cursor=cursor;
+      })
+      .htmlElementsData([])
+      .htmlLat("lat")
+      .htmlLng("lng")
+      .labelsData(points)
+      .labelLat("lat")
+      .labelLng("lng")
+      .labelAltitude(0.055)
+      .labelText(function(d){return d.name;})
+      .labelSize(function(d){return d.iso===state.iso?0.82:0.56;})
+      .labelDotRadius(0)
+      .labelColor(function(d){return d.iso===state.iso?"rgba(255,255,255,.95)":"rgba(255,224,138,.78)";})
+      .labelResolution(3)
+      .ringsData([])
+      .ringLat("lat")
+      .ringLng("lng")
+      .ringColor(function(d){
+        return function(t){
+          var a=.5*(1-t);
+          return "rgba(255,224,138,"+a+")";
+        };
+      })
+      .ringMaxRadius(3.2)
+      .ringPropagationSpeed(0.7)
+      .ringRepeatPeriod(1200)
+      .arcsData([]);
+    globe.controls().enableDamping=true;
+    globe.controls().dampingFactor=0.07;
+    globe.controls().autoRotate=!prefersReduced;
+    globe.controls().autoRotateSpeed=0.55;
+    if(coarsePointer){
+      /* On touch, OrbitControls sets touch-action:none and eats every
+         one-finger swipe, so the page cannot be scrolled past the globe.
+         Turn off drag-rotate and zoom so a vertical swipe scrolls the page;
+         the globe keeps auto-spinning and taps still select a country. */
+      var ctrls=globe.controls();
+      ctrls.enableRotate=false;
+      ctrls.enableZoom=false;
+      var allowScroll=function(){
+        var cvs=wrap.querySelector("canvas");
+        if(cvs)cvs.style.touchAction="pan-y";
+        wrap.style.touchAction="pan-y";
+      };
+      allowScroll();
+      requestAnimationFrame(allowScroll);
+      setTimeout(allowScroll,300);
+    }
+    globe.pointOfView({lat:18,lng:55,altitude:2.75},0);
+    requestAnimationFrame(function(){
+      if(wrap.clientWidth&&globe.width){
+        globe.width(wrap.clientWidth).height(Math.max(wrap.clientHeight||0,window.innerWidth<=640?280:420));
+        globe.pointOfView({lat:18,lng:55,altitude:window.innerWidth<=640?3.1:2.75},0);
+      }
+      try{
+        var renderer=globe.renderer&&globe.renderer();
+        if(renderer&&renderer.setPixelRatio)renderer.setPixelRatio(1);
+      }catch(e){}
+    });
+    globeReady=true;
+    if(loading)loading.style.display="none";
+    if(hint)hint.textContent=coarsePointer?"TAP A GLOWING DOT • SWIPE TO SCROLL":"SPIN THE GLOBE • CHOOSE A COUNTRY";
+    wrap.addEventListener("pointermove",updatePointerFromMouse);
+    /* Select on pointerup, not click: OrbitControls calls preventDefault on
+       touch, which suppresses the synthetic click and made taps miss. A short,
+       still press is a tap (select the nearest marker); a longer drag spins. */
+    var downX=0,downY=0,startedOnGlobe=false;
+    wrap.addEventListener("pointerdown",function(e){
+      draggingGlobe=true;
+      startedOnGlobe=true;
+      downX=e.clientX;downY=e.clientY;
+      wrap.style.cursor="grabbing";
+      var canvas=wrap.querySelector("canvas");
+      if(canvas)canvas.style.cursor="grabbing";
+    });
+    window.addEventListener("pointerup",function(e){
+      draggingGlobe=false;
+      wrap.style.cursor="grab";
+      var canvas=wrap.querySelector("canvas");
+      if(canvas)canvas.style.cursor="grab";
+      if(!startedOnGlobe)return;
+      startedOnGlobe=false;
+      if(Math.abs(e.clientX-downX)+Math.abs(e.clientY-downY)>14)return;
+      var pick=hoverPoint||markerAtEvent(e);
+      if(pick)selectCountry(state.iso===pick.iso?"":pick.iso,true);
+    });
+    /* a page scroll fires pointercancel, not pointerup: reset without selecting */
+    window.addEventListener("pointercancel",function(){
+      draggingGlobe=false;startedOnGlobe=false;wrap.style.cursor="grab";
+    });
+    if(typeof ResizeObserver!=="undefined"){
+      new ResizeObserver(function(){
+        var nw=wrap.clientWidth,nh=Math.max(wrap.clientHeight||0,window.innerWidth<=640?280:340);
+        if(nw&&globe.width)globe.width(nw).height(nh);
+      }).observe(wrap);
+    }
+  }catch(e){
+    hideGlobe();
+  }
+}
+
+initGlobe=initLiveGlobe;
+loadThree=loadGlobeLib;
+
+function selectCountry(iso,fromGlobe){
+  state.iso=iso;
+  $sel.value=iso;
+  refreshGlobeStyles();
+  if(iso){flyTo(iso);}else{resumeSpin();}
+  render();
+  if(fromGlobe){
+    showView("list");
+    document.querySelector(".controls").scrollIntoView({behavior:prefersReduced?"auto":"smooth"});
+  }
+}
+$sel.addEventListener("change",function(){
+  selectCountry($sel.value,false);
+});
+
+/* -------------- STATS -------------- */
+function countUp(node,target){
+  if(prefersReduced){node.textContent=target;return;}
+  var start=performance.now(),dur=1200;
+  function tick(t){
+    var p=Math.min((t-start)/dur,1);p=1-Math.pow(1-p,3);
+    node.textContent=Math.round(target*p);
+    if(p<1)requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+/* -------------- FILTER CHIPS + DROPDOWN -------------- */
+function buildControls(){
+  /* dropdown: alphabetical, with counts */
+  var isos=Object.keys(byIso).sort(function(a,b){
+    return nameOf(a).localeCompare(nameOf(b));
+  });
+  var opts='<option value="">All countries ('+all.length+' scholarships)</option>';
+  isos.forEach(function(iso){
+    opts+='<option value="'+iso+'"'+(state.iso===iso?" selected":"")+'>'+
+      esc(nameOf(iso))+' ('+byIso[iso].length+')</option>';
+  });
+  $sel.innerHTML=opts;
+
+  /* tag chips derived from the sheet's tags column */
+  var th='<span class="chip-label">Type</span>'+
+    '<button class="chip'+(state.tag===""?" active":"")+'" data-tag="">All types</button>';
+  topTags.forEach(function(t){
+    th+='<button class="chip'+(state.tag===t.key?" active":"")+'" data-tag="'+esc(t.key)+'">'+
+      esc(t.label)+'<span class="count">'+t.n+'</span></button>';
+  });
+  $tagRow.innerHTML=th;
+}
+$tagRow.addEventListener("click",function(e){
+  var b=e.target.closest("[data-tag]");
+  if(!b)return;
+  state.tag=b.getAttribute("data-tag");
+  buildControls();render();
+});
+
+if($soon){
+  $soon.addEventListener("click",function(){
+    state.soon=!state.soon;
+    $soon.classList.toggle("active",state.soon);
+    showView("list");
+    render();
+  });
+}
+
+/* -------------- RESULTS -------------- */
+function matches(s){
+  if(state.iso&&s._iso!==state.iso)return false;
+  if(state.tag&&s._tags.indexOf(state.tag)===-1)return false;
+  if(state.soon&&!deadlineInfo(col(s,"deadline")).soon)return false;
+  if(state.q){
+    var hay=(col(s,"title")+" "+tagsOf(s).join(" ")+" "+col(s,"short_note")+" "+nameOf(s._iso)).toLowerCase();
+    if(hay.indexOf(state.q)===-1)return false;
+  }
+  return true;
+}
+
+function cardHTML(s,i){
+  var iso=s._iso;
+  var tags=tagsOf(s).slice(0,3);
+  var note=col(s,"short_note");
+  var url=safeUrl(col(s,"url")||col(s,"link"));
+  var delay=prefersReduced?"":' style="animation-delay:'+Math.min(i*40,420)+'ms"';
+  return '<article class="card" data-id="'+s._id+'"'+delay+'>'+
+    '<div class="card-top">'+
+      '<span class="card-country">'+esc(nameOf(iso))+'</span>'+
+    '</div>'+
+    '<h3>'+esc(col(s,"title"))+'</h3>'+
+    (note?'<p class="card-note">'+esc(note)+'</p>':'')+
+    '<div class="card-tags">'+
+      tags.map(function(t){return '<span class="tag">'+esc(t)+'</span>';}).join('')+
+    '</div>'+
+    '<div class="card-foot">'+
+      (url?'<a class="details" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">View details <span>-&gt;</span></a>':'')+
+    '</div>'+
+  '</article>';
+}
+function simpleCardHTML(s,i){
+  var iso=s._iso||isoOf(col(s,"country"));
+  var tags=tagsOf(s).slice(0,3);
+  var url=safeUrl(col(s,"url")||col(s,"link"));
+  var note=col(s,"short_note");
+  var level=col(s,"level");
+  var dl=deadlineInfo(col(s,"deadline"));
+  return '<article class="card" data-id="'+s._id+'">'+
+    '<div class="card-main">'+
+      '<div class="card-top">'+
+        '<span class="card-country">'+flagOf(iso)+' '+esc(nameOf(iso))+'</span>'+
+        (level?'<span class="card-level">'+esc(level)+'</span>':'')+
+      '</div>'+
+      '<h3>'+esc(col(s,"title")||"Untitled scholarship")+'</h3>'+
+      (note?'<p class="card-note">'+esc(note)+'</p>':'')+
+      '<div class="card-tags">'+tags.map(function(t){return '<span class="tag">'+esc(t)+'</span>';}).join('')+'</div>'+
+    '</div>'+
+    '<div class="card-aside">'+
+      '<div class="deadline-box'+(dl.soon?' soon':'')+'"><span>Deadline</span><strong>'+esc(dl.label)+'</strong></div>'+
+      (url?'<a class="details" href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">Scholarship page ↗</a>':'')+
+    '</div>'+
+  '</article>';
+}
+
+function render(){
+  var filtered,anyFilter;
+  try{
+    filtered=all.filter(matches);
+    anyFilter=state.iso||state.tag||state.q||state.soon;
+    $clear.classList.toggle("show",!!anyFilter);
+  }catch(e){
+    $count.textContent="Render error";
+    $results.innerHTML='<div class="state"><span class="big">Oops.</span>'+
+      '<h3>The scholarship cards could not render</h3>'+
+      '<p>'+esc(e.message||String(e))+'</p></div>';
+    return;
+  }
+
+  if(!filtered.length){
+    $count.textContent="No scholarships found";
+    $results.innerHTML='<div class="state"><span class="big">0</span>'+
+      '<h3>Nothing here yet</h3>'+
+      '<p>No scholarships match your filters. Clear one, or try a broader search.</p>'+
+      '<button type="button" id="emptyClear">Clear all filters</button></div>';
+    var ec=document.getElementById("emptyClear");
+    if(ec)ec.addEventListener("click",clearAll);
+    return;
+  }
+
+  try{
+    $count.innerHTML="<b>"+filtered.length+"</b> scholarship"+(filtered.length===1?"":"s")+
+      (state.iso?" in "+esc(nameOf(state.iso)):
+       " across "+new Set(filtered.map(function(s){return s._iso;})).size+" countries")+
+      (state.soon?" · closing within "+CLOSING_SOON_DAYS+" days":"");
+    $results.innerHTML='<section class="region"><div class="grid">'+
+      filtered.map(simpleCardHTML).join('')+
+      '</div></section>';
+    if(!$results.querySelector(".card")){
+      throw new Error("No scholarship cards were produced.");
+    }
+  }catch(e){
+    $count.textContent="Render error";
+    $results.innerHTML='<div class="state"><span class="big">Oops.</span>'+
+      '<h3>The scholarship cards could not render</h3>'+
+      '<p>'+esc(e.message||String(e))+'</p></div>';
+  }
+}
+
+function clearAll(){
+  $q.value="";
+  state.q="";state.tag="";state.soon=false;
+  if($soon)$soon.classList.remove("active");
+  selectCountry("",false);
+  buildControls();
+  render();
+}
+$clear.addEventListener("click",clearAll);
+
+var qTimer;
+$q.addEventListener("input",function(){
+  clearTimeout(qTimer);
+  qTimer=setTimeout(function(){
+    state.q=$q.value.toLowerCase().trim();
+    render();
+  },160);
+});
+
+/* surprise: pick a random scholarship, fly the globe to it */
+document.getElementById("surprise").addEventListener("click",function(){
+  showView("list");
+  var pool=all.filter(matches);
+  if(!pool.length)pool=all;
+  if(!pool.length)return;
+  var pick=pool[Math.floor(Math.random()*pool.length)];
+  selectCountry(pick._iso,false);
+  buildControls();
+  requestAnimationFrame(function(){
+    var node=document.querySelector('.card[data-id="'+pick._id+'"]');
+    if(!node)return;
+    node.scrollIntoView({behavior:prefersReduced?"auto":"smooth",block:"center"});
+    node.classList.add("pulse");
+    setTimeout(function(){node.classList.remove("pulse");},2400);
+  });
+});
+
+/* -------------- IFRAME HEIGHT REPORTER -------------- */
+function postHeight(){
+  if(window.parent===window)return;
+  window.parent.postMessage({type:"cap-atlas-height",height:document.documentElement.scrollHeight},"*");
+}
+window.addEventListener("load",postHeight);
+window.addEventListener("resize",postHeight);
+new MutationObserver(function(){postHeight();}).observe(document.body,{childList:true,subtree:true});
+
+/* -------------- BOOT -------------- */
+function ingest(rows){
+  all=rows.filter(function(o){return col(o,"title")&&col(o,"country");});
+  if(!all.length)throw new Error("empty");
+  all.forEach(function(s,i){
+    s._id=i;
+    s._iso=isoOf(col(s,"country"));
+    s._tags=tagsOf(s).map(function(t){return t.toLowerCase();});
+  });
+  byIso={};
+  all.forEach(function(s){(byIso[s._iso]=byIso[s._iso]||[]).push(s);});
+  maxCount=1;
+  Object.keys(byIso).forEach(function(k){maxCount=Math.max(maxCount,byIso[k].length);});
+
+  var freq={};
+  all.forEach(function(s){s._tags.forEach(function(t){freq[t]=(freq[t]||0)+1;});});
+  topTags=Object.keys(freq)
+    .filter(function(t){return freq[t]>=2;})
+    .sort(function(a,b){return freq[b]-freq[a];})
+    .slice(0,10)
+    .map(function(t){return{key:t,label:titleCase(t),n:freq[t]};});
+
+  countUp(document.getElementById("statScholar"),all.length);
+  countUp(document.getElementById("statCountry"),Object.keys(byIso).length);
+
+  buildControls();
+  render();
+  setTimeout(function(){
+    loadThree()
+      .then(function(){initGlobe();})
+      .catch(function(){hideGlobe();});
+  },0);
+  setTimeout(postHeight,800);
+}
+
+fetch(CSV_URL,{cache:"no-store"})
+  .then(function(r){
+    if(!r.ok)throw new Error("status "+r.status);
+    return r.text();
+  })
+  .then(function(text){
+    ingest(toObjects(parseCSV(text)));
+  })
+  .catch(function(){
+    if(all.length)return;
+    document.getElementById("globeLoading").style.display="none";
+    $count.textContent="";
+    $results.innerHTML='<div class="state"><span class="big">Hmm.</span>'+
+      '<h3>The atlas could not be reached</h3>'+
+      '<p>The scholarship data did not load. Please refresh, or check that the Google Sheet is still published to the web.</p>'+
+      '<button type="button" onclick="location.reload()">Try again</button></div>';
+  });
+
+})();
+</script>
+</body>
+</html>
